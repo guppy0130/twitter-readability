@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Twitter Readability</title>
+        <link href="https://fonts.googleapis.com/css?family=Khula:400,700" rel="stylesheet">
+        <script src="https://d3js.org/d3.v3.min.js"></script>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!--[if IE] | gte IE 9>
+            <script src="https://cdn.polyfill.io/v2/polyfill.js?features=fetch,Promise"></script>
+        <![endif]-->
+        <!-- ALSO IF IE, SILLY IE-->
+        <script>
+            var isIE = window.navigator.msPointerEnabled;
+            if (isIE) {
+                var script = document.createElement('script');
+                script.src = 'https://cdn.polyfill.io/v2/polyfill.js?features=fetch,Promise';
+                document.head.appendChild(script);
+            }
+        </script>
+        <script type="text/javascript" asysnc src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=AM_HTMLorMML"></script>
+        <script type="text/javascript" async src="//cdn.jsdelivr.net/jstat/latest/jstat.min.js"></script>
+        <script src="https://unpkg.com/simple-statistics@4.1.0/dist/simple-statistics.min.js"></script>
+        <script>
+            (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+                (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+                m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+                })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+            ga('create', 'UA-71663718-2', 'auto');
+            ga('send', 'pageview');
+        </script>
+        <style>
+            body {
+                font-family: 'Khula', sans-serif;
+                font-weight: normal;
+                line-height: 1.4;
+                width: 80vw;
+                margin: 0 auto;
+                color: #111111;
+            }
+            p, li, td {
+                font-size: 1.2em;
+            }
+            h1, h2, h3, h4, h5, h6 {
+                font-family: 'Khula', sans-serif;
+                font-weight: bold;
+            }
+            h1 {
+                font-size: 4em;
+            }
+            h2 {
+                font-size: 2.5em;
+            }
+            h3 {
+                font-size: 1.6em;
+            }
+            th {
+                font-size: 1.4em;
+            }
+            th, td {
+                border: 1px solid black;
+                padding: 0.5vh 0.5vw;
+            }
+            table {
+                border-collapse: collapse;
+            }
+            .trumpFleschKincaidScoresHistogram rect {
+                fill: #81C14B;
+            }
+            .trumpFleschKincaidScoresHistogram text {
+                fill: black;
+                text-anchor: end;
+            }
+            .trumpFleschKincaidScoreHistogram * {
+                shape-rendering: crispEdges;
+            }
+            #normalDistUSFigures .line {
+                fill: #ffffff;
+                stroke: #81C14B;
+                stroke-width: 2px;
+                fill-opacity: 0;
+            }
+            #normalDistUSFigures .line:hover {
+                stroke-width: 4px;
+                fill: #468412;
+                fill-opacity: 0.4;
+            }
+            #normalDistUSFigures .dem {
+                stroke: #6A8EAE;
+            }
+            #normalDistUSFigures .dem:hover {
+                fill: #9BD1E5;
+            }
+            #normalDistUSFigures .rep {
+                stroke: #D00000;
+            }
+            #normalDistUSFigures .rep:hover {
+                fill: #a20021;
+            }
+            #normalDistUSFigures .news {
+                stroke: #F9A03F;
+            }
+            #normalDistUSFigures .news:hover {
+                fill: #F9A03F;
+            }
+            #normalDistUSFigures .trump {
+                stroke-width: 6px;
+                fill: #D00000;
+                fill-opacity: 0.05;
+            }
+            .bold {
+                font-weight: bold;
+            }
+            a {
+                text-decoration: none;
+                color: #81C14B;
+            }
+            @media screen and (max-width: 600px) {
+                body {
+                    width: 90vw;
+                }
+                h1 {
+                    font-size: 2em;
+                }
+                h2 {
+                    font-size: 1.6em;
+                }
+                h3, th {
+                    font-size: 1.2em;
+                }
+                p, li, td {
+                    font-size: 1em;
+                }
+                figure {
+                    margin: 0 auto;
+                }
+                g text {
+                    font-size: .7em;
+                }
+            }
+        </style>
+    </head>
+    <body onload="getStats()">
+        <h1>Does Trump Tweet Like a Fifth Grader?</h1>
+        <h2>Or, does everyone?</h2>
+        <h3>The Tweets</h3>
+
+        <p>200 of Trump's recent Tweets and their Flesh-Kincaid scores include:</p>
+        <button id="showTweets" onclick="var el=document.getElementById('tableWrap');if(el.style.display == 'none'){el.style.display = 'table';}else{el.style.display = 'none';}">Toggle Tweets</button>
+        <table id="tableWrap" style="display: none">
+            <tbody id="testboxOrder">
+                <tr>
+                    <th>Number</th>
+                    <th>Tweet</th>
+                    <th>Flesch-Kincaid score</th>
+                </tr>
+            </tbody>
+        </table>
+        <p>For the purposes of isolating content Trump himself has written, we removed @usernames, URLs, hashtags, and content in single quotes (which were usually titles), because those aren't from Trump himself. We've kept the responses to his retweets, though, since those are considered original content. These 200 will be used in the following analysis.</p>
+
+        <h3>The Flesh-Kincaid Grade Level Test</h3>
+        <p>The Flesch-Kincaid Grade Level test is a readability formula that returns a value that suggests the minimum grade level required to understand a text. We've applied the Flesh-Kincaid Grade Level test to each of the 200 Tweets you see above. The Flesch-Kincaid formula looks at the average number of syllables per word and words per sentence to determine the final output. The formula and history is readily available online, such as <a href="https://en.wikipedia.org/wiki/Flesch%E2%80%93Kincaid_readability_tests#Flesch.E2.80.93Kincaid_grade_level">Wikipedia</a>. The Flesch-Kincaid formula, however, may return negative grade values (the theoretical minimum being -3.4, but we managed -9.8 with some of his cleaned-up Tweets), so we set those to zero, because a negative grade level doesn't make sense but it still counts as a tweet.</p>
+
+        <h2>The Data Report</h2>
+        <p>200 of Trump's Tweets were collected from the Twitter API. They were saved in a file named <a href="trump.json" onclick="ga('send', 'event', 'Raw Data', 'download', 'Trump's Twitter API response')">trump.json</a>. Each tweet is then stripped of URLs, hashtags, usernames, and content in single quotes. Whatever is left over is then processed according to the Flesch-Kincaid test. You may view the source in the developer console. Because we sampled 200 of his most recent messages and not an SRS of all (at the time of writing) approximtely 35,000 Tweets, we proceed with caution. However, we sincerely doubt time has an effect on his tweeting style and thus are reasonably confident in the sample's representation of the population. There were difficulties in every part of the process, but that's expected in a project like this.</p>
+
+        <h3>The Difficulties (and some solutions!)</h3>
+        <table id="tableDifficulties">
+            <tr>
+                <th>Problem</th>
+                <th>Solution</th>
+                <th>Potential solution (if applicable)</th>
+            </tr>
+            <tr>
+                <td>Accessing the Twitter API via the browser's <code>fetch</code> API: Twitter has no CORS headers</td>
+                <td>Save and supply 200 Tweets first, and then solve this problem later</td>
+                <td>CORS proxy</td>
+            </tr>
+            <tr>
+                <td>No Javascript drop-in script with good documentation for the Flesch-Kincaid test</td>
+                <td>Get an NPM module and use <code>browserify</code> to <code>require(text-statistics)</code> as the drop-in <code>&lt;script&gt;</code> solution</td>
+                <td>Writing one yourself, somehow</td>
+            </tr>
+            <tr>
+                <td>Troubleshooting issues</td>
+                <td>Refresh a lot and try moving stuff around</td>
+                <td>Purchasing a <a href="https://en.wikipedia.org/wiki/Rubber_duck_debugging">rubber duck</a></td>
+            </tr>
+            <tr>
+                <td>First time with D3.js</td>
+                <td>Copy and paste from other people's work! And hope it's correct</td>
+                <td>Figuring it out at some point. That, and scrollmagic.</td>
+            </tr>
+        </table>
+
+        <h2>Exploring the Data</h2>
+        <h3>Visualizing the Flesch-Kincaid Scores of Trump's Tweets</h3>
+        <figure>
+            <svg class="trumpFleschKincaidScoresHistogram" width="80vw"></svg>
+            <figcaption>More Normally distributed than expected! Cool.</figcaption>
+        </figure>
+        <p>The data ranges between <span id="trumpFKMin"></span> and <span id="trumpFKMax"></span>. Not particularly surprising; Tweets, after all, are limited to 140 characters and the platform is not the best place to write scholarly articles with lots of syllables required to obtain higher scores. We note that besides grades 0-1 and beyond 9, the frequency of the grade levels is pretty Normally distributed. The mean grade level Trump writes at is `barx=`<span id="trumpFKAvg"></span>, with standard deviation `s=`<span id="trumpFKStDev"></span>. The interquartile range is <span id="trumpFKIQR"></span>. The five number summary for this data set is <span id="trumpFKFiveNumberSummary"></span></p>
+
+        <h2>Analyzing the Data</h2>
+        <p><span class="bold">Population:</span> The population consists of Trump's Tweets.</p>
+        <p><span class="bold">Paramater:</span> The parameter of interest is the mean Flesch-Kincaid grade level of Trump's Tweets, <i>`&mu;`</i>.</p>
+        <p><span class="bold">Hypotheses:</span><br><span class="bold">H<sub>0</sub>:</span> <i>`&mu;`</i> = 0.5 The null hypothesis claims that the mean Flesch-Kincaid grade level of Trump's Tweets is 5.<br><span class="bold">H<sub>a</sub>:</span> <i>&mu;</i> &gt; 0.5 The alternative hypothesis claims that the mean Flesch-Kincaid grade level of Trump's Tweets is greater than 5.<br>`&alpha;` = 0.05, one sample t test</p>
+        <p><span class="bold">Conditions:</span></p>
+        <ol>
+            <li><span class="bold">SRS:</span> Because we took 200 of his most recent Tweets and was limited by the API, we cannot claim this is an SRS of all his Tweets and therefore if we continue testing, we do so with caution.</li>
+            <li><span class="bold">Normality:</span> Because we sampled with `n=200` and 200 is greater than 30, we claim the Central Limit Theorem ensures approximate Normality. Also, the histogram is pretty helpful in indicating some form of Normality.</li>
+            <li><span class="bold">Independence:</span> Assuming more than 10 &times; 200 = 2000 Tweets to sample without replacement.</li>
+        </ol>
+        <p><span class="bold">Calculations:</span><br> `t=(barx - mu)/(s/sqrt(n)) = ` <span id="trumpTestCalc">``</span> `=` <span id="trumpTestResult">``</span><br><span id="trumpTestPVal">``</span> with 199 degrees of freedom</p>
+
+        <p><span class="bold">Interpretation:</span> Because our P value is approximately one which is greater than `&alpha; = 0.05`, the result is not statistically significant and we fail to reject H<sub>0</sub>, implying that Trump writes Tweets at a level that fifth graders can read.</p>
+
+        <h2>How Does Trump Compare to Others on Twitter?</h2>
+        <ol>
+            <li>Obama's <a href="https://twitter.com/potus44">@POTUS44</a> account has a mean score of 2.9595 and a standard deviation of 2.4208.</li>
+            <li>Obama's <a href="https://twitter.com/BarackObama">@BarackObama</a> account has a mean score of 3.5460 and a standard deviation of 2.8715.</li>
+            <li>Marine Le Pen's <a href="https://twitter.com/MLP_officiel">@MLP_Officiel</a> account has a mean score of 2.9860 and a standard devation of 2.4641.</li>
+            <li>Mike Pence's <a href="https://twitter.com/mike_pence">@mike_pence</a> account has a mean score of 4.0327 and a standard devation of 2.6341.</li>
+            <li>Hillary Clintons's <a href="https://twitter.com/HillaryClinton">@HillaryClinton</a> account has a mean score of 2.2875 and a standard devation of 2.2590.</li>
+            <li>Bernie Sanders's <a href="https://twitter.com/BernieSanders">@BernieSanders</a> account has a mean score of 3.3040 and a standard devation of 2.5791.</li>
+            <li>Pope Francis's <a href="https://twitter.com/Pontifex">@Pontifex</a> account has a mean score of 3.8290 and a standard devation of 2.2842.</li>
+            <li>Neil deGrasse Tyson's <a href="https://twitter.com/neiltyson">@neiltyson</a> account has a mean score of 2.7905 and a standard devation of 2.6475.</li>
+            <li>Geoffrey Nunberg's <a href="https://twitter.com/geoffnunberg">@geoffnunberg</a> account has a mean score of 2.826 and a standard devation of 3.4224.</li>
+            <li>Kim Kardashian's <a href="https://twitter.com/kimkardashian">@kimkardashian</a> account has a mean score of 1.3045 and a standard devation of 2.0895.</li>
+            <li>The New York Times's <a href="https://twitter.com/nytimes">@nytimes</a> account has a mean score of 3.8195 and a standard devation of 2.6372.</li>
+            <li>CNN's <a href="https://twitter.com/CNN">@CNN</a> account has a mean score of 5.0780 and a standard devation of 2.7170.</li>
+            <li>Smithsonian's <a href="https://twitter.com/smithsonian">@smithsonian</a> account has a mean score of 2.9230 and a standard devation of 2.4340.</li>
+            <li>NASA's <a href="https://twitter.com/NASA">@NASA</a> account has a mean score of 3.5905 and a standard devation of 2.5758.</li>
+            <li>Lin Manuel's <a href="https://twitter.com/Lin_Manuel">@Lin_Manuel</a> account has a mean score of 0.9690 and a standard devation of 1.6057.</li>
+            <li>Breitbart's <a href="https://twitter.com/BreitbartNews">@BreitbartNews</a> account has a mean score of 1.3870 and a standard devation of 3.0470.</li>
+            <li>The Ellen Show's <a href="https://twitter.com/TheEllenShow">@TheEllenShow</a> account has a mean score of 1.0005 and a standard devation of 1.4122.</li>
+            <li>Penguin Books UK's <a href="https://twitter.com/PenguinUKBooks">@PenguinUKBooks</a> account has a mean score of 2.9340 and a standard devation of 2.3593.</li>
+        </ol>
+        <p>Not all these accounts could be used in the following graphic.</p>
+
+        <h3>Comparing Trump Against Other Popular US Figures with more than 2,000 Tweets</h3>
+        <p>We're comparing against popular US figures with more than 2,000 Tweets in order to match the 200 &times; 10 population requirement in the previous test. Each Normal curve is generated from 3000 Normally distributed values (randomly generated) with the mean and standard deviation of grades as indicated by this program. The value 3000 was selected as an appearance factor; lower values generated non-smooth curves that floated off the axis, and larger values would take too long to generate. Hover over each curve on desktop to view who owns which curve.</p>
+        <div id="normalDistUSFigures"></div>
+
+        <p>Orange is news-related agencies. Red is for Republicans; blue for Democrats. Green is for entertainment-related accounts.</p>
+
+        <h2>Next steps</h2>
+        <p>We will continue to improve upon this piece; additional categories of people, generating different charts for each category and comparing Trump to each (visually), and making this piece more accessible to others to run their own tests. As it stands now, the page itself is fairly accessible to copy and use to run your own tests. If you are interested in the entire, kit, with examples and the raw data for each of the accounts listed here with more than 2,000 Tweets, they will be available at {GITHUB LINK}, along with instructions on how to duplicate the project and test your own tweets. We are also looking into adding a textbox in which you may enter your own Tweets.</p>
+
+        <script>
+            function getStats() {
+                (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+
+                (function(glob) {
+
+                    function cleanText(text) {
+                        // all these tags should be preceeded by a full stop.
+                        var fullStopTags = ['li', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'dd'];
+
+                        fullStopTags.forEach(function(tag) {
+                            text = text.replace("</" + tag + ">",".");
+                        })
+
+                        text = text
+                            .replace(/<[^>]+>/g, "")				// Strip tags
+                            .replace(/[,:;()\-]/, " ")				// Replace commans, hyphens etc (count them as spaces)
+                            .replace(/[\.!?]/, ".")					// Unify terminators
+                            .replace(/^\s+/,"")						// Strip leading whitespace
+                            .replace(/[ ]*(\n|\r\n|\r)[ ]*/," ")	// Replace new lines with spaces
+                            .replace(/([\.])[\. ]+/,".")			// Check for duplicated terminators
+                            .replace(/[ ]*([\.])/,". ")				// Pad sentence terminators
+                            .replace(/\s+/," ")						// Remove multiple spaces
+                            .replace(/\s+$/,"");					// Strip trailing whitespace
+
+                        text += "."; // Add final terminator, just in case it's missing.
+
+                        return text;
+                    }
+
+                    var TextStatistics = function TextStatistics(text) {
+                        this.text = text ? cleanText(text) : this.text;
+                    };
+
+                    TextStatistics.prototype.fleschKincaidReadingEase = function(text) {
+                        text = text ? cleanText(text) : this.text;
+                        return Math.round((206.835 - (1.015 * this.averageWordsPerSentence(text)) - (84.6 * this.averageSyllablesPerWord(text)))*10)/10;
+                    };
+
+                    TextStatistics.prototype.fleschKincaidGradeLevel = function(text) {
+                        text = text ? cleanText(text) : this.text;
+                        return Math.round(((0.39 * this.averageWordsPerSentence(text)) + (11.8 * this.averageSyllablesPerWord(text)) - 15.59)*10)/10;
+                    };
+
+                    TextStatistics.prototype.gunningFogScore = function(text) {
+                        text = text ? cleanText(text) : this.text;
+                        return Math.round(((this.averageWordsPerSentence(text) + this.percentageWordsWithThreeSyllables(text, false)) * 0.4)*10)/10;
+                    };
+
+                    TextStatistics.prototype.colemanLiauIndex = function(text) {
+                        text = text ? cleanText(text) : this.text;
+                        return Math.round(((5.89 * (this.letterCount(text) / this.wordCount(text))) - (0.3 * (this.sentenceCount(text) / this.wordCount(text))) - 15.8 ) *10)/10;
+                    };
+
+                    TextStatistics.prototype.smogIndex = function(text) {
+                        text = text ? cleanText(text) : this.text;
+                        return Math.round(1.043 * Math.sqrt((this.wordsWithThreeSyllables(text) * (30 / this.sentenceCount(text))) + 3.1291)*10)/10;
+                    };
+
+                    TextStatistics.prototype.automatedReadabilityIndex = function(text) {
+                        text = text ? cleanText(text) : this.text;
+                        return Math.round(((4.71 * (this.letterCount(text) / this.wordCount(text))) + (0.5 * (this.wordCount(text) / this.sentenceCount(text))) - 21.43)*10)/10;
+                    };
+
+                    TextStatistics.prototype.textLength = function(text) {
+                        text = text ? cleanText(text) : this.text;
+                        return text.length;
+                    };
+
+                    TextStatistics.prototype.letterCount = function(text) {
+                        text = text ? cleanText(text) : this.text;
+                        text = text.replace(/[^a-z]+/ig,"");
+                        return text.length;
+                    };
+
+                    TextStatistics.prototype.sentenceCount = function(text) {
+                        text = text ? cleanText(text) : this.text;
+
+                        // Will be tripped up by "Mr." or "U.K.". Not a major concern at this point.
+                        return text.replace(/[^\.!?]/g, '').length || 1;
+                    };
+
+                    TextStatistics.prototype.wordCount = function(text) {
+                        text = text ? cleanText(text) : this.text;
+                        return text.split(/[^a-z0-9]+/i).length || 1;
+                    };
+
+                    TextStatistics.prototype.averageWordsPerSentence = function(text) {
+                        text = text ? cleanText(text) : this.text;
+                        return this.wordCount(text) / this.sentenceCount(text);
+                    };
+
+                    TextStatistics.prototype.averageSyllablesPerWord = function(text) {
+                        text = text ? cleanText(text) : this.text;
+                        var syllableCount = 0, wordCount = this.wordCount(text), self = this;
+
+                        text.split(/\s+/).forEach(function(word) {
+                            syllableCount += self.syllableCount(word);
+                        });
+
+                        // Prevent NaN...
+                        return (syllableCount||1) / (wordCount||1);
+                    };
+
+                    TextStatistics.prototype.wordsWithThreeSyllables = function(text, countProperNouns) {
+                        text = text ? cleanText(text) : this.text;
+                        var longWordCount = 0, self = this;
+
+                        countProperNouns = countProperNouns === false ? false : true;
+
+                        text.split(/\s+/).forEach(function(word) {
+
+                            // We don't count proper nouns or capitalised words if the countProperNouns attribute is set.
+                            // Defaults to true.
+                            if (!word.match(/^[A-Z]/) || countProperNouns) {
+                                if (self.syllableCount(word) > 2) longWordCount ++;
+                            }
+                        });
+
+                        return longWordCount;
+                    };
+
+                    TextStatistics.prototype.percentageWordsWithThreeSyllables = function(text, countProperNouns) {
+                        text = text ? cleanText(text) : this.text;
+
+                        return (this.wordsWithThreeSyllables(text,countProperNouns) / this.wordCount(text)) * 100;
+                    };
+
+                    TextStatistics.prototype.syllableCount = function(word) {
+                        var syllableCount = 0,
+                            prefixSuffixCount = 0,
+                            wordPartCount = 0;
+
+                        // Prepare word - make lower case and remove non-word characters
+                        word = word.toLowerCase().replace(/[^a-z]/g,"");
+
+                        // Specific common exceptions that don't follow the rule set below are handled individually
+                        // Array of problem words (with word as key, syllable count as value)
+                        var problemWords = {
+                            "simile":		3,
+                            "forever":		3,
+                            "shoreline":	2
+                        };
+
+                        // Return if we've hit one of those...
+                        if (problemWords[word]) return problemWords[word];
+
+                        // These syllables would be counted as two but should be one
+                        var subSyllables = [
+                            /cial/,
+                            /tia/,
+                            /cius/,
+                            /cious/,
+                            /giu/,
+                            /ion/,
+                            /iou/,
+                            /sia$/,
+                            /[^aeiuoyt]{2,}ed$/,
+                            /.ely$/,
+                            /[cg]h?e[rsd]?$/,
+                            /rved?$/,
+                            /[aeiouy][dt]es?$/,
+                            /[aeiouy][^aeiouydt]e[rsd]?$/,
+                            /^[dr]e[aeiou][^aeiou]+$/, // Sorts out deal, deign etc
+                            /[aeiouy]rse$/ // Purse, hearse
+                        ];
+
+                        // These syllables would be counted as one but should be two
+                        var addSyllables = [
+                            /ia/,
+                            /riet/,
+                            /dien/,
+                            /iu/,
+                            /io/,
+                            /ii/,
+                            /[aeiouym]bl$/,
+                            /[aeiou]{3}/,
+                            /^mc/,
+                            /ism$/,
+                            /([^aeiouy])\1l$/,
+                            /[^l]lien/,
+                            /^coa[dglx]./,
+                            /[^gq]ua[^auieo]/,
+                            /dnt$/,
+                            /uity$/,
+                            /ie(r|st)$/
+                        ];
+
+                        // Single syllable prefixes and suffixes
+                        var prefixSuffix = [
+                            /^un/,
+                            /^fore/,
+                            /ly$/,
+                            /less$/,
+                            /ful$/,
+                            /ers?$/,
+                            /ings?$/
+                        ];
+
+                        // Remove prefixes and suffixes and count how many were taken
+                        prefixSuffix.forEach(function(regex) {
+                            if (word.match(regex)) {
+                                word = word.replace(regex,"");
+                                prefixSuffixCount ++;
+                            }
+                        });
+
+                        wordPartCount = word
+                            .split(/[^aeiouy]+/ig)
+                            .filter(function(wordPart) {
+                                return !!wordPart.replace(/\s+/ig,"").length
+                            })
+                            .length;
+
+                        // Get preliminary syllable count...
+                        syllableCount = wordPartCount + prefixSuffixCount;
+
+                        // Some syllables do not follow normal rules - check for them
+                        subSyllables.forEach(function(syllable) {
+                            if (word.match(syllable)) syllableCount --;
+                        });
+
+                        addSyllables.forEach(function(syllable) {
+                            if (word.match(syllable)) syllableCount ++;
+                        });
+
+                        return syllableCount || 1;
+                    };
+
+                    function textStatistics(text) {
+                        return new TextStatistics(text);
+                    }
+
+                    (typeof module != "undefined" && module.exports) ? (module.exports = textStatistics) : (typeof define != "undefined" ? (define("textstatistics", [], function() { return textStatistics; })) : (glob.textstatistics = textStatistics));
+                })(this);
+                },{}],2:[function (require,module,exports){
+                    var textStatistics = require('text-statistics');
+
+                    fetch('trump.json').then(function(result) {
+                        return result.json();
+                    }).then(function(data) {
+                        var regexURL = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-z]{2,4}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)/gi,
+                            regexHash = /\S*#(?:\[[^\]]+\]|\S+)/gi,
+                            regexUsername = /(^|[^@\w])@(\w{1,15})\b/gi,
+                            regexSingleQuote = /'[^'"]*'(?=(?:[^"]*"[^"]*")*[^"]*$)/g,
+                            FleschKincaidResultArr = [];
+
+                        for (var i = 0; i < data.length; i++) {
+
+                            data[i].text = data[i].text.replace(regexURL,'').replace(regexHash,'').replace(regexUsername,'').replace(regexSingleQuote,'');
+
+                            if(data[i].text) {
+                                var FleschKincaidResult = textStatistics(data[i].text).fleschKincaidGradeLevel();
+                                if (FleschKincaidResult < 0) {
+                                    FleschKincaidResult = 0;
+                                } else if (FleschKincaidResult > 16) {
+                                    FleschKincaidResult = 16;
+                                }
+                            } else {
+                                var FleschKincaidResult = 0;
+                            }
+                            FleschKincaidResultArr.push(FleschKincaidResult);
+
+                            var listitem = document.createElement('tr');
+
+                            listitem.innerHTML = '<td>'+(i+1)+'</td><td>'+data[i].text+'</td><td>'+FleschKincaidResult+'</td>';
+                            document.getElementById('testboxOrder').appendChild(listitem);
+                        }
+
+                        document.getElementById('trumpFKMin').innerHTML = ss.min(FleschKincaidResultArr).toFixed(0);
+
+                        document.getElementById('trumpFKMax').innerHTML = ss.max(FleschKincaidResultArr).toFixed(1);
+
+                        document.getElementById('trumpFKAvg').innerHTML = ss.mean(FleschKincaidResultArr).toFixed(4);
+
+                        document.getElementById('trumpFKStDev').innerHTML = ss.sampleStandardDeviation(FleschKincaidResultArr).toFixed(4);
+
+                        document.getElementById('trumpFKIQR').innerHTML = ss.interquartileRange(FleschKincaidResultArr).toFixed(1);
+
+                        document.getElementById('trumpFKFiveNumberSummary').innerHTML = "{" + ss.min(FleschKincaidResultArr).toFixed(1) + ", " +ss.quantile(FleschKincaidResultArr,0.25).toFixed(1) + ", " +ss.median(FleschKincaidResultArr).toFixed(1) + ", " +ss.quantile(FleschKincaidResultArr,0.75).toFixed(1) + ", " +ss.max(FleschKincaidResultArr).toFixed(1) + "}";
+
+                        /* Generate the Trumpogram */
+                        function trumpOGram() {
+                                // A formatter for counts.
+                            var formatCount = d3.format(",.0f");
+                            var values = FleschKincaidResultArr;
+
+                            var margin = {top: 20, right: 30, bottom: 30, left: 30},
+                                width = window.innerWidth * 0.8 - margin.left - margin.right,
+                                height = window.innerWidth * 0.8 * 0.5 - margin.top - margin.bottom;
+
+                            var x = d3.scale.linear()
+                                  .domain([0,16])
+                                  .range([0, width]);
+
+                            // Generate a histogram using twenty uniformly-spaced bins.
+                            var data = d3.layout.histogram()
+                                .bins(x.ticks(16))
+                                (values);
+
+                            var yMax = d3.max(data, function(d){return d.length});
+                            var yMin = d3.min(data, function(d){return d.length});
+
+                            var y = d3.scale.linear()
+                                .domain([0, yMax])
+                                .range([height, 0]);
+
+                            var xAxis = d3.svg.axis()
+                                .scale(x)
+                                .orient("bottom");
+
+                            function widthCalc() {
+                                if (window.innerWidth > 600) {
+                                    return 20;
+                                } else {
+                                    return 40;
+                                }
+                            }
+
+                            var svg = d3.select(".trumpFleschKincaidScoresHistogram")
+                                .attr("width", width + widthCalc())
+                                .attr("height", height + 60)
+                              .append("g")
+                                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+                            var bar = svg.selectAll(".bar")
+                                .data(data)
+                              .enter().append("g")
+                                .attr("class", "bar")
+                                .attr("transform", function(d) { return "translate(" + x(d.x) + "," + y(d.y) + ")"; });
+
+                            bar.append("rect")
+                                .attr("x", 1)
+                                .attr("width", (x(data[0].dx) - x(0)))
+                                .attr("height", function(d) { return height - y(d.y); })
+
+                            function textCalc() {
+                                if (window.innerWidth > 600) {
+                                    return .045;
+                                } else {
+                                    return .065;
+                                }
+                            }
+
+                            bar.append("text")
+                                .attr("dy", .6+textCalc()+"em")
+                                .attr("y", -15)
+                                .attr("x", width * textCalc())
+                                .attr("text-anchor", "middle")
+                                .text(function(d) { return formatCount(d.y); });
+
+                            svg.append("g")
+                                .attr("class", "xAxis")
+                                .attr("transform", "translate(0," + height + ")")
+                                .call(xAxis);
+
+                            svg.append("text")
+                                .attr("class", "xLabel")
+                                .attr("text-anchor", "end")
+                                .attr("x", width / 2 + 140)
+                                .attr("y", height + 35)
+                                .text("Flesch-Kincaid Reading Grade Level");
+
+                            svg.append("text")
+                                .attr("class", "yLabel")
+                                .attr("text-anchor", "end")
+                                .attr("x", -height / 2 + 50)
+                                .attr("y", -18)
+                                .attr("dy", ".75em")
+                                .attr("transform", "rotate(-90)")
+                                .text("Frequency");
+                        }
+
+                        trumpOGram();
+
+                        MathJax.Hub.Queue(["Text",MathJax.Hub.getAllJax('trumpTestCalc')[0],'('+ss.mean(FleschKincaidResultArr).toFixed(4)+'-5)/('+ss.sampleStandardDeviation(FleschKincaidResultArr).toFixed(4)+'/sqrt(200))']);
+
+                        MathJax.Hub.Queue(["Text",MathJax.Hub.getAllJax('trumpTestResult')[0],"-"+jStat.tscore(5, ss.mean(FleschKincaidResultArr).toFixed(4), ss.sampleStandardDeviation(FleschKincaidResultArr).toFixed(4), FleschKincaidResultArr.length).toFixed(4)]);
+
+                        MathJax.Hub.Queue(["Text",MathJax.Hub.getAllJax('trumpTestPVal')[0],('P~~'+((1 - jStat.ttest(5, FleschKincaidResultArr, 1)).toFixed(4)))]);
+                    }).catch(function(error) {
+                        console.log(error);
+                    });
+
+
+
+                },{"text-statistics":1}]},{},[2]);
+
+                var otherTwitterAccts = [
+                    "CNN", 5.0780, 2.7170, "news",
+                    "Donald Trump", 3.9515, 3.0035, "trump rep",
+                    "Mike Pence", 4.0327, 2.6341, "rep",
+                    "New York Times", 3.8195, 2.6372, "news",
+                    "Barack Obama", 3.5460, 2.8715, "dem",
+                    "NASA", 3.5905, 2.5758, "news",
+                    "Bernie Sanders", 3.3040, 2.5791, "dem",
+                    "Neil deGrasse Tyson", 2.7905, 2.6475, "cel",
+                    "Smithsonian", 2.9230, 2.4340, "news",
+                    "Penguin UK Books", 2.9340, 2.3593, "cel",
+                    "Hillary Clinton", 2.2875, 2.2590, "dem",
+                    "Breitbart", 1.3870, 3.0470, "news",
+                    "Kim Kardashian", 1.3045, 2.0895, "cel",
+                    "Lin-Manuel Miranda", 0.9690, 1.6057, "cel",
+                    "The Ellen Show", 1.0005, 1.4122, "cel"
+                ];
+
+                function otherTwitterAcctsChartGen() {
+                    var margin = {top: 20, right: 20, bottom: 20, left: 20},
+                        outerWidth = window.innerWidth * 0.8,
+                        outerHeight = window.innerWidth * 0.8 * 0.3,
+                        width = outerWidth - margin.left - margin.right,
+                        height = outerHeight - margin.top - margin.bottom;
+
+                    function gaussian(x, gMean, gStDev) {
+                        var gaussianConstant = 1 / Math.sqrt(2 * Math.PI);
+                        x = (x - gMean) / gStDev;
+                        return gaussianConstant * Math.exp(-.5 * x * x) / gStDev;
+                    };
+
+                    function getData(val, gMean, gStDev) {
+                        var instaData = [];
+                        for (var i = 0; i < 3000; i++) {
+                            q = jStat.normal.sample(gMean, gStDev)
+                            el = {
+                                "q": q,
+                                "p": gaussian(q, gMean, gStDev)
+                            }
+                            instaData.push(el);
+                        };
+                        instaData.sort(function(x, y) {
+                            return x.q - y.q;
+                        });
+                        return instaData;
+                    }
+
+                    var superArray = [];
+
+                    for (var j = 0; j < otherTwitterAccts.length; j+=4) {
+                        var name = otherTwitterAccts[j];
+                        superArray.push(getData(name, otherTwitterAccts[j+1], otherTwitterAccts[j+2]));
+                    }
+
+                    var x = d3.scale.linear()
+                        .range([0, width])
+                        .domain([0,16]);
+
+                    var y = d3.scale.linear()
+                        .range([height, 0]);
+
+                    var xAxis = d3.svg.axis()
+                        .scale(x)
+                        .orient("bottom");
+
+                    var svg = d3.select("#normalDistUSFigures").append("svg")
+                        .attr("width", width + margin.left + margin.right)
+                        .attr("height", height + margin.top + margin.bottom)
+                        .append("g")
+                        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+                    svg.append("g")
+                        .attr("class", "x axis")
+                        .attr("transform", "translate(0," + height + ")")
+                        .call(xAxis);
+
+                    for (var i = 0; i < superArray.length; i++) {
+                        var data = superArray[i];
+
+                        var line = d3.svg.line()
+                            .x(function(d) {
+                                return x(d.q);
+                            })
+                            .y(function(d) {
+                                return y(d.p);
+                            });
+
+                        y.domain(d3.extent(data, function(d) {
+                            return d.p;
+                        }));
+
+                        svg.append("path")
+                            .datum(data)
+                            .attr("class", "line "+otherTwitterAccts[4 * i + 3])
+                            .attr("d", line)
+                            .append("svg:title")
+                                .text(function(d) {return otherTwitterAccts[4 * i]});
+
+                    }
+                }
+                otherTwitterAcctsChartGen();
+            }
+        </script>
+    </body>
+</html>
